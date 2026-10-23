@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+
+# Local datasets
+data/raw/*
+!data/raw/.gitkeep
+
+# Generated databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Local configuration
+.env
