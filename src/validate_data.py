@@ -71,23 +71,38 @@ def load(xls, sheet):
     df["reporting_date"] = pd.to_datetime(df["reporting_date"], errors="coerce")
     return df
 
+
 def show_conflicts(df, k, conflict, sheet, max_groups=10):
     # every row that shares a key with a conflicting row, including the identical copies
+    # k[conflict] holds the keys of the conflicting rows and k.isin() is true for every row
+    # whose key is in that set, so this keeps the whole group and not just the odd one out
     rows = df[k.isin(k[conflict])]
+    # keep only the descriptive columns this sheet has that identify a group
     ident = [c for c in ["reporting_date", "company_name", "channel_type", "cover_type",
                          "subject", "category", "data_item", "unit"] if c in df.columns]
+    # counts the distinct conflicting keys, which is the number of groups
     print(f"\n  {sheet}: {k[conflict].nunique()} key groups contain conflicting values (showing up to {max_groups})")
+    # groupby splits the rows into one group per key and each loop gives (key, group_table)
+    # the key itself isn't needed so it goes into _ and g is the group's rows
+    # k.loc[rows.index] picks the key for just these rows so it lines up with them
+    # enumerate adds a counter i so the loop can stop after max_groups groups
     for i, (_, g) in enumerate(rows.groupby(k.loc[rows.index])):
+        # stop once max_groups groups have been printed
         if i == max_groups:
             break
+        # print the identifying fields once, taken from the first row of the group
+        # as they are the same for every row in it, to_dict makes it readable on one line
         print("   ", g.iloc[0][ident].to_dict())
+        # then a small table of just the columns that can differ between the rows
+        # index=False hides pandas' own row numbers so only the Excel row shows
         print(g[["excel_row", "value_raw", "status", "num"]].to_string(index=False))
     # save every conflicting group so it can be opened in Excel
     out = REPORT.parent / f"conflicting_duplicates_{sheet.replace(' ', '_').lower()}.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
     rows.to_csv(out, index=False)
     print(f"   all {len(rows)} rows saved to {out}")
-    
+
+
 def sheet_checks(df, sheet):
     # 1. allowed values
     channels = CHANNELS | ({"Total"} if sheet == "Other" else set())
@@ -117,7 +132,16 @@ def sheet_checks(df, sheet):
     exact = vk.duplicated(keep=False)
     # checks if there are rows with same descriptive columns but different values
     conflict = k.duplicated(keep=False) & ~exact
+    # with no finalised claims, 'Est. average duration' is reported twice, once as 0
+    # and once blank. Cleaning keeps the blank, so it is reported as info instead of a failure
+    twin = df["data_item"].eq("Est. average duration") & (df["num"].eq(0) | df["status"].eq("missing"))
+    quirk = conflict & twin
+    conflict = conflict & ~quirk
+    record(sheet, "known quirk: 'Est. average duration' 0 vs blank twins", "INFO",
+           f"{int(quirk.sum())} rows in {k[quirk].nunique()} groups (cleaning keeps the blank)")
     check(sheet, "no duplicate keys with different values", not conflict.any(), f"{int(conflict.sum())} rows")
+    if conflict.any():
+        show_conflicts(df, k, conflict, sheet)
     # record the number of exact duplicate rows, and how many unique groups theyre in
     record(sheet, "exact duplicate rows (cleaning drops the extra copy)", "INFO",
            f"{int(exact.sum())} rows in {vk[exact].nunique()} groups")

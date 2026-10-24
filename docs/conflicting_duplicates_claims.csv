@@ -1,0 +1,21 @@
+excel_row,reporting_date,company_name,abn,subject,channel_type,cover_type,category,data_item,calculation_basis,value_raw,unit,notes,status,num
+52633,2021-06-30,MetLife Insurance Limited,75004274882,Claims Duration,Individual Advised,TPD,,Est. average duration,Flow (12 months),0,Months,,value,0.0
+52634,2021-06-30,MetLife Insurance Limited,75004274882,Claims Duration,Individual Advised,TPD,,Est. average duration,Flow (12 months),,Months,,missing,
+53038,2021-06-30,MLC Limited,90000000402,Claims Duration,Individual Non-Advised,Trauma,,Est. average duration,Flow (12 months),0,Months,,value,0.0
+53039,2021-06-30,MLC Limited,90000000402,Claims Duration,Individual Non-Advised,Trauma,,Est. average duration,Flow (12 months),,Months,,missing,
+54237,2021-06-30,Resolution Life Australasia Limited,84079300379,Claims Duration,Group Ordinary,DII,,Est. average duration,Flow (12 months),,Months,,missing,
+54238,2021-06-30,Resolution Life Australasia Limited,84079300379,Claims Duration,Group Ordinary,DII,,Est. average duration,Flow (12 months),0,Months,,value,0.0
+59045,2020-12-31,MetLife Insurance Limited,75004274882,Claims Duration,Individual Advised,TPD,,Est. average duration,Flow (12 months),0,Months,,value,0.0
+59046,2020-12-31,MetLife Insurance Limited,75004274882,Claims Duration,Individual Advised,TPD,,Est. average duration,Flow (12 months),,Months,,missing,
+59450,2020-12-31,MLC Limited,90000000402,Claims Duration,Individual Non-Advised,Trauma,,Est. average duration,Flow (12 months),0,Months,,value,0.0
+59451,2020-12-31,MLC Limited,90000000402,Claims Duration,Individual Non-Advised,Trauma,,Est. average duration,Flow (12 months),,Months,,missing,
+65527,2020-06-30,MetLife Insurance Limited,75004274882,Claims Duration,Individual Advised,TPD,,Est. average duration,Flow (12 months),0,Months,,value,0.0
+65528,2020-06-30,MetLife Insurance Limited,75004274882,Claims Duration,Individual Advised,TPD,,Est. average duration,Flow (12 months),,Months,,missing,
+68157,2020-06-30,The Colonial Mutual Life Assurance Society Limited,12004021809,Claims Duration,Individual Non-Advised,DII,,Est. average duration,Flow (12 months),0,Months,,value,0.0
+68158,2020-06-30,The Colonial Mutual Life Assurance Society Limited,12004021809,Claims Duration,Individual Non-Advised,DII,,Est. average duration,Flow (12 months),,Months,,missing,
+68249,2020-06-30,The Colonial Mutual Life Assurance Society Limited,12004021809,Claims Duration,Group Ordinary,TPD,,Est. average duration,Flow (12 months),0,Months,,value,0.0
+68250,2020-06-30,The Colonial Mutual Life Assurance Society Limited,12004021809,Claims Duration,Group Ordinary,TPD,,Est. average duration,Flow (12 months),,Months,,missing,
+69594,2020-06-30,Zurich Australia Limited,92000010195,Claims Duration,Group Ordinary,TPD,,Est. average duration,Flow (12 months),0,Months,,value,0.0
+69595,2020-06-30,Zurich Australia Limited,92000010195,Claims Duration,Group Ordinary,TPD,,Est. average duration,Flow (12 months),,Months,,missing,
+92786,2018-06-30,Resolution Life Australasia Limited,84079300379,Claims Duration,Individual Advised,Accident,,Est. average duration,Flow (12 months),,Months,,missing,
+92787,2018-06-30,Resolution Life Australasia Limited,84079300379,Claims Duration,Individual Advised,Accident,,Est. average duration,Flow (12 months),0,Months,,value,0.0
