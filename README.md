@@ -28,6 +28,8 @@ Coverage: 17 reporting dates (30 June and 31 December each year), 21 ABNs (24 co
 
 Every figure is a **rolling 12-month window** ending on the reporting date, so consecutive dates overlap by six months.
 
+**Data version.** This repository includes the APRA release covering June 2018 to June 2026, and all numbers in this README describe that file (row counts, Excel row numbers, and the findings below). APRA can revise earlier figures in later releases, so a newer download may not match.
+
 ## Design principles
 
 These follow from how the data is built, and they drive the cleaning rules.
@@ -63,7 +65,7 @@ Checks that passed:
 ```
 insurance-analytics/
 ├── data/
-│   ├── raw/             # APRA workbook (not committed)
+│   ├── raw/             # APRA raw insurance data, release to June 2026
 │   └── processed/       # tidy CSVs from clean_data.py (not committed)
 ├── src/
 │   ├── inspect_data.py               # sheet names, shapes, previews, masked counts
@@ -80,14 +82,12 @@ insurance-analytics/
 
 ## How to run
 
-1. Download the APRA workbook and save it in `data/raw/` with the file name used in the scripts.
-2. Install dependencies: `pip install pandas numpy openpyxl`
-3. Run each stage from the project root:
+1. Install dependencies: `pip install pandas numpy openpyxl`
+2. Run each stage from the project root:
 
 ```
 python src/inspect_data.py
 python src/validate_data.py     # writes docs/data_validation.md
-python src/clean_data.py        # writes data/processed/*.csv and docs/cleaning_log.txt
 ```
 
 ## Limitations
@@ -96,6 +96,7 @@ python src/clean_data.py        # writes data/processed/*.csv and docs/cleaning_
 - The Other sheet has no company dimension, so reasons and ratios are market-wide only.
 - Insurers that left or were renamed are separate entries in time, so market trends partly reflect entries and exits.
 - The glossary lists seven duration buckets, but the file has five for claims and three for disputes, so average duration is taken as reported and not recomputed.
+- Findings apply to this release only and haven’t been re-checked against later releases
 
 ## Tech
 
@@ -103,4 +104,4 @@ Python (pandas, numpy).
 
 ## Data source and disclaimer
 
-Data: Australian Prudential Regulation Authority (APRA), *Life Insurance Claims and Disputes Statistics*. This project is independent and not affiliated with or endorsed by APRA.
+Data: Australian Prudential Regulation Authority (APRA), [*Life Insurance Claims and Disputes Statistics*](https://www.apra.gov.au/news-and-publications/life-insurance-claims-and-disputes-statistics). This project is independent and not affiliated with or endorsed by APRA.

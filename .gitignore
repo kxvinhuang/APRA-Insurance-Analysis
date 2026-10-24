@@ -2,9 +2,12 @@
 __pycache__/
 *.pyc
 
-# Local datasets
-data/raw/*
-!data/raw/.gitkeep
+# Cleaned data
+data/processed/*
+!data/processed/.gitkeep
+
+# Excel temp files (when a workbook is open)
+~$*
 
 # Generated databases
 *.db
