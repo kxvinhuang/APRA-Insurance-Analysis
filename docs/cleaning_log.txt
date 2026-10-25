@@ -1,0 +1,15 @@
+Policy Statistics: rows read=23797, exact duplicates dropped=0, zero-vs-blank 'Est. average duration' twins dropped=0, rows kept=23797
+    value_status: {'value': 23795, 'masked': 2}
+    flagged: invalid combo=0, out of range=3
+Claims: rows read=95261, exact duplicates dropped=6, zero-vs-blank 'Est. average duration' twins dropped=10, rows kept=95245
+    value_status: {'value': 53783, 'masked': 40075, 'missing': 1387}
+    flagged: invalid combo=24, out of range=0
+Disputes: rows read=78307, exact duplicates dropped=3, zero-vs-blank 'Est. average duration' twins dropped=0, rows kept=78304
+    value_status: {'value': 43304, 'masked': 32696, 'missing': 2304}
+    flagged: invalid combo=20, out of range=0
+Other: rows read=19198, exact duplicates dropped=0, zero-vs-blank 'Est. average duration' twins dropped=0, rows kept=19198
+    value_status: {'value': 13758, 'missing': 4416, 'masked': 1024}
+    flagged: invalid combo=4080, out of range=0
+
+company_names.csv: 20 ABNs, 23 ABN/name pairs
+Files written to data\processed
