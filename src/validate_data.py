@@ -202,6 +202,44 @@ def sheet_checks(df, sheet):
     check(sheet, "no % above 100 (except rate/ratio items)", not over.any(),
           f"{int(over.sum())} rows, Excel rows {df.loc[over, 'excel_row'].head(5).tolist()}", warn=True)
 
+    # 8. spelling variants, the same name written with different capitalisation or spacing
+    found = {}
+    for col in ["company_name", "subject", "channel_type", "cover_type", "category", "data_item",
+                "calculation_basis", "unit"]:
+        if col in df.columns:
+            # distinct values with NaN removed
+            vals = pd.Series(df[col].dropna().unique(), dtype=object)
+            # lower case with sequential spaces collapsed, so spellings of one name end up identical
+            norm = vals.str.lower().str.replace(r"\s+", " ", regex=True)
+            # keep the values whose normalised form appears more than once
+            variants = vals[norm.duplicated(keep=False)].sort_values().tolist()
+            if variants:
+                found[col] = variants
+    check(sheet, "one spelling per name", not found, str(found) if found else "ok", warn=True)
+
+    # 9. each data item should always have the same unit and calculation basis
+    # lower case the data item so the capitalisation variants are counted as one item
+    item = df["data_item"].str.lower()
+    for col in ["unit", "calculation_basis"]:
+        # count the distinct units for each subject and data item
+        n = df.groupby(["subject", item])[col].nunique()
+        check(sheet, f"one {col} per data item", (n <= 1).all(),
+              f"{int((n > 1).sum())} data items with more than one", warn=True)
+
+    # 10. the notes column only has a value on masked rows stating it has been masked as sample size 
+    # is too small to be statistically credible, allowing it to be dropped later
+    if "notes" in df.columns:
+        stray = df["notes"].notna() & (df["status"] != "masked")
+        check(sheet, "Notes only on masked rows", not stray.any(), f"{int(stray.sum())} rows")
+
+    # 11. columns that must never be blank, the database will not allow nulls in them
+    required = [c for c in REQUIRED if c != "value_raw" and c in df.columns]
+    if "company_name" in df.columns:
+        required.append("company_name")
+    blank = df[required].isna().sum()
+    blank = blank[blank > 0]
+    check(sheet, "no blanks in required columns", blank.empty, str(blank.to_dict()) if len(blank) else "ok")
+
 
 def reconcile(df, sheet, subject, item, total, parts, label):
     # within each company/channel/cover/date, total category must equal the sum of its parts
