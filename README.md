@@ -2,7 +2,7 @@
 
 A data validation and cleaning project built on APRA's public life insurance claims and disputes statistics (June 2018 to June 2026), covering **all authorised life insurers**.
 
-> **Status: work in progress** (last updated 25 Oct 2026). The inspection and validation stages are done. Cleaning is in progress.
+> **Status: work in progress** (last updated 26 Oct 2026). The inspection, validation and cleaning stages are done.
 
 ## Project status
 
@@ -10,8 +10,8 @@ A data validation and cleaning project built on APRA's public life insurance cla
 |---|---|---|
 | Inspect raw data | Done | `src/inspect_data.py` |
 | Validate raw data | Done | `src/validate_data.py`, `docs/data_validation.md` |
-| Investigate data quirks | Done | `src/inspect_duration_conflicts.py` |
-| Clean to tidy CSVs | In progress | `src/clean_data.py` |
+| Investigate data quirks | Done | `src/inspect_duration_conflicts.py`, `src/inspect_disputes_spelling.py` |
+| Clean to tidy CSVs | Done | `src/clean_data.py`, `docs/cleaning_log.txt` |
 
 ## The data
 
@@ -24,7 +24,7 @@ Source: APRA, *Life Insurance Claims and Disputes Statistics* (released half-yea
 | Disputes | 78,307 | Dispute counts and outcomes, average amount paid, and dispute duration |
 | Other | 19,198 | **Industry-level only** (no company): claims frequency, claims paid ratio, and the reasons claims are declined or withdrawn and disputes are withdrawn or reversed |
 
-Coverage: 17 reporting dates (30 June and 31 December each year), 21 ABNs (24 company names) plus an industry "Total", seven cover types (Death, TPD, Trauma, DII, CCI, Funeral, Accident) and four channels (Individual Advised, Individual Non-Advised, Group Super, Group Ordinary).
+Coverage: 17 reporting dates (30 June and 31 December each year), 20 ABNs (23 company names) plus an industry "Total", seven cover types (Death, TPD, Trauma, DII, CCI, Funeral, Accident) and four channels (Individual Advised, Individual Non-Advised, Group Super, Group Ordinary).
 
 Every figure is a **rolling 12-month window** ending on the reporting date, so consecutive dates overlap by six months.
 
@@ -42,13 +42,13 @@ These follow from how the data is built, and they drive the cleaning rules.
 
 ## Data quality findings
 
-Found by `validate_data.py` and follow-up investigation. The latest validation run gave **46 passed, 3 warnings and 0 failures** (full results in `docs/data_validation.md`). The three warnings are the negative values in finding 8 and the invalid combinations in finding 7 (one warning each for Claims and Disputes). The duration conflict in finding 5 is reported as an explained, known quirk.
+Found by `validate_data.py` and follow-up investigation. The latest validation run gave **65 passed, 4 warnings and 0 failures** (full results in `docs/data_validation.md`). The four warnings are the negative values in finding 8, the invalid combinations in finding 7 (one warning each for Claims and Disputes) and the capitalisation variants in finding 4 (Disputes). The duration conflict in finding 5 is reported as an explained, known quirk.
 
 1. **Heavy masking.** About 42% of Claims values (40,075 rows) and 42% of Disputes values (32,696 rows) are masked. Claims masking ranges from 0% to about 78% depending on the insurer, so insurer-level claims metrics need to show how much of the data is hidden.
-2. **"Total" is a company.** Each of the three company sheets has an industry "Total" company with no ABN (2,124 / 8,520 / 7,004 rows). Where every value is visible, the sum of the insurers matches the Total for lives insured and annual premium (354 groups tested for each, no differences above 0.1%).
+2. **"Total" is a company.** Each of the three company sheets has an industry "Total" company with a blank ABN (2,124 / 8,520 / 7,004 rows; the cell holds a single space, which cleaning converts to NULL). Where every value is visible, the sum of the insurers matches the Total for lives insured and annual premium (354 groups tested for each, no differences above 0.1%).
 3. **Three ABNs changed name**: TAL Life Insurance Services (formerly Westpac Life Insurance Services), ART Life Insurance (formerly QInsure) and Nippon Life Insurance Australia and New Zealand (formerly MLC Limited). Companies are keyed on ABN, and name history is kept.
 4. **Inconsistent capitalisation in Disputes**, for example "Disputes lodged" and "Disputes Lodged". Left uncorrected, this silently halved the number of groups a reconciliation could test, so names are normalised during cleaning.
-5. **Contradictory duplicates.** Claims has 6 groups of exact duplicate rows (12 rows) and 10 groups (20 rows) where "Est. average duration" is published twice, once as 0 and once blank. Disputes has 3 groups of exact duplicates (6 rows). Inspecting each of the 10 groups showed that all have zero finalised claims, so the average is undefined. The validation step reports these as a known quirk, and the cleaning step keeps the blank, drops the 0, and logs the dropped rows. Any other conflicting duplicate stops the script.
+5. **Contradictory duplicates.** Claims has 6 groups of exact duplicate rows (12 rows) and 10 groups (20 rows) where "Est. average duration" is published twice, once as 0 and once blank. Disputes has 3 groups of exact duplicates (6 rows). Inspecting each of the 10 groups showed that all have zero finalised claims, so the average is undefined. The validation step reports these as a known quirk, and the cleaning step keeps the blank, drops the 0, and logs the dropped rows. Any other conflicting duplicate stops the script. The cleaning run confirmed the drops: 6 exact duplicates and 10 zero-valued twins from Claims, and 3 exact duplicates from Disputes.
 6. **Blank text in the Value column.** 10 Claims rows hold only spaces. They are treated as missing.
 7. **Combinations APRA says can't exist.** APRA's notes list CCI × Group Super as not applicable, but the data has a block of rows for it under the industry Total only (24 rows in Claims, 20 in Disputes, 18 of each holding values). These are flagged and excluded from benchmarks.
 8. **Negative lapse rates.** Three Policy Statistics values are negative (Excel rows 16099, 17731 and 23779), which the lapse rate definition (lapsed premium divided by average in-force premium) doesn't allow. They are flagged, not changed. Rates above 100% for lapse, new business and claims paid ratio are accepted as plausible.
@@ -59,11 +59,36 @@ Checks that passed:
 - On the Other sheet, reasons add up to the reported Total (2,704 groups, no failures).
 - All reporting dates are valid 30 June / 31 December dates.
 - No insurer name maps to more than one ABN.
+- Every data item has exactly one unit and one calculation basis.
+- The Notes column is only filled in on masked rows.
+- No required column has a blank cell.
+
+## Cleaning results
+
+`clean_data.py` writes `policy_stats.csv`, `claims.csv`, `disputes.csv`, `industry_stats.csv` (the Other sheet), `company_names.csv` and `exceptions_dropped_duplicates.csv` to `data/processed/` (not committed), and logs the run to `docs/cleaning_log.txt`.
+
+| Sheet | Rows read | Exact duplicates dropped | Zero-vs-blank twins dropped | Rows kept |
+|---|---|---|---|---|
+| Policy Statistics | 23,797 | 0 | 0 | 23,797 |
+| Claims | 95,261 | 6 | 10 | 95,245 |
+| Disputes | 78,307 | 3 | 0 | 78,304 |
+| Other | 19,198 | 0 | 0 | 19,198 |
+
+Value status after cleaning:
+
+| Sheet | value | masked | missing |
+|---|---|---|---|
+| Policy Statistics | 23,795 | 2 | 0 |
+| Claims | 53,783 | 40,075 | 1,387 |
+| Disputes | 43,304 | 32,696 | 2,304 |
+| Other | 13,758 | 1,024 | 4,416 |
+
+Rows flagged and kept: 24 Claims and 20 Disputes rows with `is_invalid_combo` (the CCI × Group Super block from finding 7), 4,080 Other rows with `is_invalid_combo` (the blank grid from finding 9) and 3 Policy Statistics rows with `is_out_of_range` (the negative values from finding 8). `company_names.csv` holds 20 ABNs and 23 ABN/name pairs.
 
 ## Repository structure
 
 ```
-insurance-analytics/
+APRA-Insurance-Analysis/
 ├── data/
 │   ├── raw/             # APRA raw insurance data, release to June 2026
 │   └── processed/       # tidy CSVs from clean_data.py (not committed)
@@ -71,9 +96,11 @@ insurance-analytics/
 │   ├── inspect_data.py               # sheet names, shapes, previews, masked counts
 │   ├── validate_data.py              # integrity checks -> docs/data_validation.md
 │   ├── inspect_duration_conflicts.py # one-off investigation behind finding 5
+│   ├── inspect_disputes_spelling.py  # one-off check behind finding 4
 │   └── clean_data.py                 # tidy, typed, flagged CSVs
 ├── docs/
 │   ├── data_validation.md
+│   ├── cleaning_log.txt
 │   └── conflicting_duplicates_claims.csv
 ├── .gitignore
 ├── requirements.txt
@@ -88,6 +115,7 @@ insurance-analytics/
 ```
 python src/inspect_data.py
 python src/validate_data.py     # writes docs/data_validation.md
+python src/clean_data.py        # writes data/processed/*.csv and docs/cleaning_log.txt
 ```
 
 ## Limitations
@@ -96,7 +124,7 @@ python src/validate_data.py     # writes docs/data_validation.md
 - The Other sheet has no company dimension, so reasons and ratios are market-wide only.
 - Insurers that left or were renamed are separate entries in time, so market trends partly reflect entries and exits.
 - The glossary lists seven duration buckets, but the file has five for claims and three for disputes, so average duration is taken as reported and not recomputed.
-- Findings apply to this release only and haven’t been re-checked against later releases
+- Findings apply to this release only
 
 ## Tech
 
