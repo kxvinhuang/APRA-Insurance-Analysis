@@ -9,10 +9,5 @@ data/processed/*
 # Excel temp files (when a workbook is open)
 ~$*
 
-# Generated databases
-*.db
-*.sqlite
-*.sqlite3
-
 # Local configuration
 .env

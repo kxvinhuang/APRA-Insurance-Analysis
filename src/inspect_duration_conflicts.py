@@ -1,7 +1,8 @@
 import pandas as pd
 from pathlib import Path
 
-excel = Path("data/raw/Life insurance claims and disputes statistics database June 2018 to June 2026.xlsx")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+excel = PROJECT_ROOT / "data/raw/Life insurance claims and disputes statistics database June 2018 to June 2026.xlsx"
 df = pd.read_excel(excel, sheet_name="Claims", dtype={"ABN": str})
 csv = Path("docs/conflicting_duplicates_claims.csv")
 conf = pd.read_csv(csv)

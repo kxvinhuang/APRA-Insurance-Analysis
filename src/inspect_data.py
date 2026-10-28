@@ -4,7 +4,8 @@ import pandas as pd
 PREVIEW_ROWS = 10
 PREVIEW_COLS = 12
 
-file_path = Path("data/raw/Life insurance claims and disputes statistics database June 2018 to June 2026.xlsx")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+FILE = PROJECT_ROOT / "data/raw/Life insurance claims and disputes statistics database June 2018 to June 2026.xlsx"
 RELEVANT_SHEETS = ['Policy Statistics', 'Claims', 'Disputes', 'Other']
 
 def inspect(path: Path) -> None:
@@ -28,4 +29,4 @@ def inspect(path: Path) -> None:
 
 
 if __name__ == "__main__":
-    inspect(file_path)
+    inspect(FILE)

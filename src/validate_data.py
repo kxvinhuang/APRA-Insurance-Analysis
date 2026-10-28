@@ -2,7 +2,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-FILE = Path("data/raw/Life insurance claims and disputes statistics database June 2018 to June 2026.xlsx")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+FILE = PROJECT_ROOT / "data/raw/Life insurance claims and disputes statistics database June 2018 to June 2026.xlsx"
 REPORT = Path("docs/data_validation.md")
 
 SHEETS = ["Policy Statistics", "Claims", "Disputes", "Other"]
