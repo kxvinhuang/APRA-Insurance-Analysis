@@ -46,7 +46,7 @@ These follow from how the data is built, and they drive the cleaning rules.
 
 Found by `validate_data.py` and follow-up investigation. The latest validation run gave **65 passed, 4 warnings and 0 failures** (full results in `docs/data_validation.md`). The four warnings are the negative values in finding 8, the invalid combinations in finding 7 (one warning each for Claims and Disputes) and the capitalisation variants in finding 4 (Disputes). The duration conflict in finding 5 is reported as an explained, known quirk.
 
-1. **Heavy masking.** About 42% of Claims values (40,075 rows) and 42% of Disputes values (32,696 rows) are masked. Claims masking ranges from 0% to about 78% depending on the insurer, so insurer-level claims metrics need to show how much of the data is hidden.
+1. **Heavy masking.** About 42% of Claims values (40,075 rows) and 42% of Disputes values (32,696 rows) are masked. Claims masking ranges from 2% to about 78% depending on the insurer, so insurer-level claims metrics need to show how much of the data is hidden.
 2. **"Total" is a company.** Each of the three company sheets has an industry "Total" company with a blank ABN (2,124 / 8,520 / 7,004 rows; the cell holds a single space, which cleaning converts to NULL). Where every value is visible, the sum of the insurers matches the Total for lives insured and annual premium (354 groups tested for each, no differences above 0.1%).
 3. **Three ABNs changed name**: TAL Life Insurance Services (formerly Westpac Life Insurance Services), ART Life Insurance (formerly QInsure) and Nippon Life Insurance Australia and New Zealand (formerly MLC Limited). Companies are keyed on ABN, and name history is kept.
 4. **Inconsistent capitalisation in Disputes**, for example "Disputes lodged" and "Disputes Lodged". Left uncorrected, this silently halved the number of groups a reconciliation could test, so names are normalised during cleaning.
@@ -129,6 +129,7 @@ APRA-Insurance-Analysis/
 │   ├── inspect_data.py               # sheet names, shapes, previews, masked counts
 │   ├── validate_data.py              # integrity checks -> docs/data_validation.md
 │   ├── inspect_duration_conflicts.py # one-off investigation behind finding 5
+│   ├── inspect_masking.py            # one-off inspection behind finding 1
 │   ├── inspect_disputes_spelling.py  # one-off check behind finding 4
 │   ├── clean_data.py                 # tidy, typed, flagged CSVs
 │   └── load_to_sql.py                # loads the CSVs into PostgreSQL and checks row counts

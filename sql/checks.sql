@@ -76,6 +76,7 @@ WHERE received IS NOT NULL AND finalised IS NOT NULL AND withdrawn IS NOT NULL A
 
 -- 8. share of values hidden by masking, per company (ABN-level, so renamed insurers are one row)
 -- just a new check to see which companies have the most masked values
+-- should be roughly similar to the raw data check in inspect_masking.py
 SELECT 'claims' AS sheet, c.company_name, COUNT(*) AS rows,
        ROUND(100.0 * COUNT(*) FILTER (WHERE f.value_status = 'masked') / COUNT(*), 1) AS pct_masked
 FROM fact_claims f
