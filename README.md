@@ -2,7 +2,7 @@
 
 A data validation and cleaning project built on APRA's public life insurance claims and disputes statistics (June 2018 to June 2026), covering **all authorised life insurers**.
 
-> **Status: work in progress** (last updated 26 Oct 2026). The inspection, validation and cleaning stages are done.
+> **Status: work in progress** (last updated 28 Oct 2026). The inspection, validation, cleaning and database load and check stages are done.
 
 ## Project status
 
@@ -12,6 +12,8 @@ A data validation and cleaning project built on APRA's public life insurance cla
 | Validate raw data | Done | `src/validate_data.py`, `docs/data_validation.md` |
 | Investigate data quirks | Done | `src/inspect_duration_conflicts.py`, `src/inspect_disputes_spelling.py` |
 | Clean to tidy CSVs | Done | `src/clean_data.py`, `docs/cleaning_log.txt` |
+| Load to PostgreSQL | Done | `src/load_to_sql.py`, `sql/schema.sql`, `sql/load.sql` |
+| Check the database against the reports | Done | `sql/checks.sql` |
 
 ## The data
 
@@ -85,6 +87,37 @@ Value status after cleaning:
 
 Rows flagged and kept: 24 Claims and 20 Disputes rows with `is_invalid_combo` (the CCI × Group Super block from finding 7), 4,080 Other rows with `is_invalid_combo` (the blank grid from finding 9) and 3 Policy Statistics rows with `is_out_of_range` (the negative values from finding 8). `company_names.csv` holds 20 ABNs and 23 ABN/name pairs.
 
+## Database
+
+The cleaned CSVs are loaded into a PostgreSQL star schema. `sql/schema.sql` creates the tables, `src/load_to_sql.py` copies each CSV into a staging table, and `sql/load.sql` builds the dimensions and facts from staging. `sql/checks.sql` holds queries that re-derive numbers from the validation and cleaning reports (row counts, value status, flagged rows, industry Total against the sum of insurers, claims reconciliation, and masking by company).
+
+| Type | Tables |
+|---|---|
+| Dimensions | `dim_date`, `dim_company` (with `company_name_history`), `dim_channel`, `dim_cover`, `dim_category`, `dim_measure` |
+| Facts | `fact_policy`, `fact_claims`, `fact_disputes`, `fact_industry` (the Other sheet, so no company) |
+
+Load results (every CSV row became exactly one row in its table):
+
+| Table | CSV rows | Rows loaded |
+|---|---|---|
+| fact_policy | 23,797 | 23,797 |
+| fact_claims | 95,245 | 95,245 |
+| fact_disputes | 78,304 | 78,304 |
+| fact_industry | 19,198 | 19,198 |
+| company_name_history | 23 | 23 |
+
+The dimensions hold 17 dates, 21 companies (20 insurers plus the industry Total), 5 channels (the four channels plus Total), 7 covers, 28 categories (27 plus a "no category" row) and 35 measures.
+
+Design decisions:
+
+- **Companies are keyed on ABN**, with a name history table, so a renamed insurer stays one company. The industry Total has no ABN.
+- **A measure is a subject plus a data item.** The same reason name appears under both claims withdrawn reasons and dispute withdrawn reasons, so a category alone is not unique. Each measure has one unit and one calculation basis.
+- **Rows with no category point to a "(none)" category** (id 0), so no fact key contains a NULL.
+- **Masked and missing values are NULL with a `value_status`**, and constraints stop a masked or missing row from holding a number.
+- **`is_additive` marks which measures can be summed** (counts and dollar totals, but not rates, averages or shares). This is my own classification and not something APRA publishes.
+- **The Total flags live on the dimensions** (`is_industry_total`, `is_total_channel`, `is_total_category`), so one filter excludes them everywhere.
+- **The load is one transaction.** It compares each table's row count with its CSV and rolls everything back if any count differs, so a failed load leaves the database as it was.
+
 ## Repository structure
 
 ```
@@ -97,11 +130,17 @@ APRA-Insurance-Analysis/
 │   ├── validate_data.py              # integrity checks -> docs/data_validation.md
 │   ├── inspect_duration_conflicts.py # one-off investigation behind finding 5
 │   ├── inspect_disputes_spelling.py  # one-off check behind finding 4
-│   └── clean_data.py                 # tidy, typed, flagged CSVs
+│   ├── clean_data.py                 # tidy, typed, flagged CSVs
+│   └── load_to_sql.py                # loads the CSVs into PostgreSQL and checks row counts
+├── sql/
+│   ├── schema.sql                    # star schema and staging tables
+│   ├── load.sql                      # builds dimensions and facts from staging
+│   └── checks.sql                    # queries that re-derive numbers from the reports
 ├── docs/
 │   ├── data_validation.md
 │   ├── cleaning_log.txt
 │   └── conflicting_duplicates_claims.csv
+├── .env                 # database connection details (not committed)
 ├── .gitignore
 ├── requirements.txt
 └── README.md
@@ -109,14 +148,27 @@ APRA-Insurance-Analysis/
 
 ## How to run
 
-1. Install dependencies: `pip install pandas numpy openpyxl`
-2. Run each stage from the project root:
+1. Install dependencies: `pip install -r requirements.txt`
+2. Create a PostgreSQL database (for example `CREATE DATABASE insurance_analytics;`) and add a `.env` file in the project root:
+
+```
+PGHOST=localhost
+PGPORT=5432
+PGDATABASE=insurance_analytics
+PGUSER=postgres
+PGPASSWORD=your_password
+```
+
+3. Run each stage from the project root:
 
 ```
 python src/inspect_data.py
 python src/validate_data.py     # writes docs/data_validation.md
 python src/clean_data.py        # writes data/processed/*.csv and docs/cleaning_log.txt
+python src/load_to_sql.py       # builds the tables in PostgreSQL and checks the row counts
 ```
+
+Then run `sql/checks.sql` in pgAdmin or psql to compare the database with the validation and cleaning reports.
 
 ## Limitations
 
@@ -124,11 +176,11 @@ python src/clean_data.py        # writes data/processed/*.csv and docs/cleaning_
 - The Other sheet has no company dimension, so reasons and ratios are market-wide only.
 - Insurers that left or were renamed are separate entries in time, so market trends partly reflect entries and exits.
 - The glossary lists seven duration buckets, but the file has five for claims and three for disputes, so average duration is taken as reported and not recomputed.
-- Findings apply to this release only
+- Findings apply to this release only.
 
 ## Tech
 
-Python (pandas, numpy).
+Python (pandas, numpy, psycopg2) and PostgreSQL.
 
 ## Data source and disclaimer
 
