@@ -1,6 +1,7 @@
 .venv/
 __pycache__/
 *.pyc
+.vscode/
 
 # Cleaned data
 data/processed/*

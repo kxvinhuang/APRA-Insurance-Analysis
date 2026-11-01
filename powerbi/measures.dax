@@ -1,0 +1,230 @@
+// measures.dax
+// Every measure for the dashboard
+//
+// three core ideas are maintained throughout all measures:
+//   1. reporting windows overlap, so additive measures are blank unless exactly one date is in view.
+//   2. they exclude the industry 'Total' company so it is never added to the insurers.
+//   3. 'Industry' measures use the Total company's own rows which is visible even when insurers are masked.
+
+
+// ===== helper ================================================================================
+// Format: Whole number
+Dates Selected = DISTINCTCOUNT ( dim_date[date_key] )
+
+
+// ===== policy ================================================================================
+// Format: Whole number, thousands separator
+Lives Insured =
+IF ( [Dates Selected] = 1,
+     CALCULATE ( SUM ( v_policy[lives_insured] ), dim_company[is_industry_total] = FALSE ) )
+
+// Format: Currency ($), 0 decimals (display units: millions or billions on the visual)
+Annual Premium =
+IF ( [Dates Selected] = 1,
+     CALCULATE ( SUM ( v_policy[annual_premium] ), dim_company[is_industry_total] = FALSE ) )
+
+// Format: Percentage, 1 decimal
+Premium Share =
+DIVIDE ( [Annual Premium], CALCULATE ( [Annual Premium], REMOVEFILTERS ( dim_company ) ) )
+
+// Premium-weighted, since APRA's denominator is average in-force premium.
+// Format: Custom  0.0"%"   (the source values are already in percent, e.g. 12.5)
+Lapse Rate % =
+IF ( [Dates Selected] = 1,
+  CALCULATE (
+    DIVIDE (
+      SUMX ( FILTER ( v_policy, NOT ISBLANK ( v_policy[lapse_rate_pct] ) ),
+             v_policy[lapse_rate_pct] * v_policy[annual_premium] ),
+      SUMX ( FILTER ( v_policy, NOT ISBLANK ( v_policy[lapse_rate_pct] ) ),
+             v_policy[annual_premium] ) ),
+    dim_company[is_industry_total] = FALSE ) )
+
+// Format: Custom  0.0"%"
+New Business Rate % =
+IF ( [Dates Selected] = 1,
+  CALCULATE (
+    DIVIDE (
+      SUMX ( FILTER ( v_policy, NOT ISBLANK ( v_policy[new_business_rate_pct] ) ),
+             v_policy[new_business_rate_pct] * v_policy[annual_premium] ),
+      SUMX ( FILTER ( v_policy, NOT ISBLANK ( v_policy[new_business_rate_pct] ) ),
+             v_policy[annual_premium] ) ),
+    dim_company[is_industry_total] = FALSE ) )
+
+// Rank of each insurer by premium on the latest reporting date, ignoring the date slicer.
+// Used as a visual filter ("is less than or equal to 5") to pick the top insurers for trend lines.
+// Format: Whole number
+Premium Rank (latest) =
+VAR LatestDate = CALCULATE ( MAX ( v_policy[date_key] ), REMOVEFILTERS ( dim_date ) )
+RETURN
+    RANKX (
+        ALL ( dim_company[company_name] ),
+        CALCULATE ( SUM ( v_policy[annual_premium] ),
+                    dim_date[date_key] = LatestDate,
+                    dim_company[is_industry_total] = FALSE ),
+        ,
+        DESC,
+        DENSE
+    )
+
+
+// ===== claims ================================================================================
+// Format: Whole number, thousands separator
+Claims Received =
+IF ( [Dates Selected] = 1,
+     CALCULATE ( SUM ( v_claims[received] ), dim_company[is_industry_total] = FALSE ) )
+
+// has_outcomes means finalised, admitted and declined are all visible, so a rate never mixes visible and hidden numbers
+// Format: Whole number, thousands separator
+Admitted (visible) =
+CALCULATE ( SUM ( v_claims[admitted] ), v_claims[has_outcomes] = TRUE, dim_company[is_industry_total] = FALSE )
+
+// Format: Whole number, thousands separator
+Declined (visible) =
+CALCULATE ( SUM ( v_claims[declined] ), v_claims[has_outcomes] = TRUE, dim_company[is_industry_total] = FALSE )
+
+// Format: Whole number, thousands separator
+Finalised (visible) =
+CALCULATE ( SUM ( v_claims[finalised] ), v_claims[has_outcomes] = TRUE, dim_company[is_industry_total] = FALSE )
+
+// Format: Percentage, 1 decimal
+Admit Rate = IF ( [Dates Selected] = 1, DIVIDE ( [Admitted (visible)], [Finalised (visible)] ) )
+
+// Format: Percentage, 1 decimal
+Decline Rate = IF ( [Dates Selected] = 1, DIVIDE ( [Declined (visible)], [Finalised (visible)] ) )
+
+// The industry's own reported figures, the benchmark for the insurer charts.
+// Format: Percentage, 1 decimal
+Industry Admit Rate =
+IF ( [Dates Selected] = 1,
+  CALCULATE ( DIVIDE ( SUM ( v_claims[admitted] ), SUM ( v_claims[finalised] ) ),
+              REMOVEFILTERS ( dim_company ),
+              dim_company[is_industry_total] = TRUE,
+              v_claims[has_outcomes] = TRUE ) )
+
+
+// ===== claim duration ========================================================================
+// Weighted by finalised claims. Groups with no finalised claims have a blank average (see finding 5), so they are skipped.
+// Format: Decimal number, 1 decimal
+Avg Duration (months) =
+IF ( [Dates Selected] = 1,
+  CALCULATE (
+    DIVIDE (
+      SUMX ( FILTER ( v_claims, NOT ISBLANK ( v_claims[est_avg_duration_months] ) && NOT ISBLANK ( v_claims[duration_finalised] ) ),
+             v_claims[est_avg_duration_months] * v_claims[duration_finalised] ),
+      SUMX ( FILTER ( v_claims, NOT ISBLANK ( v_claims[est_avg_duration_months] ) && NOT ISBLANK ( v_claims[duration_finalised] ) ),
+             v_claims[duration_finalised] ) ),
+    dim_company[is_industry_total] = FALSE ) )
+
+// Format: Decimal number, 1 decimal
+Industry Avg Duration (months) =
+IF ( [Dates Selected] = 1,
+  CALCULATE (
+    DIVIDE (
+      SUMX ( FILTER ( v_claims, NOT ISBLANK ( v_claims[est_avg_duration_months] ) && NOT ISBLANK ( v_claims[duration_finalised] ) ),
+             v_claims[est_avg_duration_months] * v_claims[duration_finalised] ),
+      SUMX ( FILTER ( v_claims, NOT ISBLANK ( v_claims[est_avg_duration_months] ) && NOT ISBLANK ( v_claims[duration_finalised] ) ),
+             v_claims[duration_finalised] ) ),
+    REMOVEFILTERS ( dim_company ), dim_company[is_industry_total] = TRUE ) )
+
+// Estimated count of claims in a time band (the source gives each band as a rounded percentage)
+// Format: Whole number
+Band Claims (est.) =
+IF ( [Dates Selected] = 1,
+     CALCULATE ( SUM ( v_claims_duration[est_claims] ), dim_company[is_industry_total] = FALSE ) )
+
+// Format: Percentage, 1 decimal
+Band Share =
+DIVIDE ( [Band Claims (est.)], CALCULATE ( [Band Claims (est.)], REMOVEFILTERS ( v_claims_duration[band] ) ) )
+
+// Format: Percentage, 1 decimal
+Industry Band Share =
+IF ( [Dates Selected] = 1,
+  DIVIDE (
+    CALCULATE ( SUM ( v_claims_duration[est_claims] ),
+                REMOVEFILTERS ( dim_company ), dim_company[is_industry_total] = TRUE ),
+    CALCULATE ( SUM ( v_claims_duration[est_claims] ),
+                REMOVEFILTERS ( dim_company ), dim_company[is_industry_total] = TRUE,
+                REMOVEFILTERS ( v_claims_duration[band] ) ) ) )
+
+
+// ===== industry ratios (Other sheet) =========================================================
+// Rates, so they need one date, one cover and the 'Total' channel.
+// Format: Custom  0.00"%"   (the source values are already in percent, e.g. 0.2)
+Claims Frequency % =
+IF ( [Dates Selected] = 1 && HASONEVALUE ( dim_cover[cover_name] ),
+     CALCULATE ( MAX ( v_industry_ratios[claims_frequency_pct] ), dim_channel[is_total_channel] = TRUE ) )
+
+// Format: Custom  0.0"%"
+Claims Paid Ratio % =
+IF ( [Dates Selected] = 1 && HASONEVALUE ( dim_cover[cover_name] ),
+     CALCULATE ( MAX ( v_industry_ratios[claims_paid_ratio_pct] ), dim_channel[is_total_channel] = TRUE ) )
+
+
+// ===== disputes ==============================================================================
+// Format: Whole number, thousands separator
+Disputes Lodged =
+IF ( [Dates Selected] = 1,
+     CALCULATE ( SUM ( v_disputes[lodged] ), dim_company[is_industry_total] = FALSE ) )
+
+// Format: Whole number
+Disputes Resolved (visible) =
+CALCULATE ( SUM ( v_disputes[resolved] ), v_disputes[has_outcomes] = TRUE, dim_company[is_industry_total] = FALSE )
+
+// Format: Whole number
+Disputes Reversed (visible) =
+CALCULATE ( SUM ( v_disputes[reversed] ), v_disputes[has_outcomes] = TRUE, dim_company[is_industry_total] = FALSE )
+
+// Format: Whole number
+Disputes Maintained (visible) =
+CALCULATE ( SUM ( v_disputes[maintained] ), v_disputes[has_outcomes] = TRUE, dim_company[is_industry_total] = FALSE )
+
+// Format: Whole number
+Disputes Other Outcomes (visible) =
+CALCULATE ( SUM ( v_disputes[other_outcomes] ), v_disputes[has_outcomes] = TRUE, dim_company[is_industry_total] = FALSE )
+
+// Format: Percentage, 1 decimal
+Reversal Rate = IF ( [Dates Selected] = 1, DIVIDE ( [Disputes Reversed (visible)], [Disputes Resolved (visible)] ) )
+
+// Uses lives insured at the reporting date, APRA's published ratio uses the period average, so values differ slightly.
+// Only rows where both the dispute count and the lives insured are visible are used.
+// Format: Decimal number, 1 decimal
+Disputes per 100k Lives =
+IF ( [Dates Selected] = 1,
+  CALCULATE (
+    DIVIDE (
+      SUMX ( FILTER ( v_disputes, NOT ISBLANK ( v_disputes[lodged] ) && NOT ISBLANK ( v_disputes[lives_insured] ) ),
+             v_disputes[lodged] ),
+      SUMX ( FILTER ( v_disputes, NOT ISBLANK ( v_disputes[lodged] ) && NOT ISBLANK ( v_disputes[lives_insured] ) ),
+             v_disputes[lives_insured] ) ) * 100000,
+    dim_company[is_industry_total] = FALSE ) )
+
+
+// ===== reasons (Other sheet) =================================================================
+// Reason names repeat across reason_group, so every visual using these must be filtered or split by reason_group.
+// Format: Whole number
+Reason Count =
+IF ( [Dates Selected] = 1,
+     CALCULATE ( SUM ( v_industry_reasons[reason_count] ), v_industry_reasons[is_total_category] = FALSE ) )
+
+// Format: Whole number
+Reasons Total =
+IF ( [Dates Selected] = 1,
+     CALCULATE ( SUM ( v_industry_reasons[reason_count] ),
+                 v_industry_reasons[is_total_category] = TRUE,
+                 REMOVEFILTERS ( v_industry_reasons[reason] ) ) )
+
+// Format: Percentage, 1 decimal
+Reason Share = DIVIDE ( [Reason Count], [Reasons Total] )
+
+
+// ===== masking (data quality page) ===========================================================
+// A share of rows, so it is fine to use across dates.
+// Format: Percentage, 1 decimal
+Masked Share =
+DIVIDE ( CALCULATE ( SUM ( v_masking[masked_rows] ), dim_company[is_industry_total] = FALSE ),
+         CALCULATE ( SUM ( v_masking[total_rows] ),  dim_company[is_industry_total] = FALSE ) )
+
+// Format: Percentage, 1 decimal
+Industry Total Masked Share =
+CALCULATE ( DIVIDE ( SUM ( v_masking[masked_rows] ), SUM ( v_masking[total_rows] ) ),
+            REMOVEFILTERS ( dim_company ), dim_company[is_industry_total] = TRUE )

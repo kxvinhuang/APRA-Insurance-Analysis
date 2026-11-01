@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 PROCESSED = Path("data/processed")
 SCHEMA_SQL = Path("sql/schema.sql")
 LOAD_SQL = Path("sql/load.sql")
+VIEWS_SQL = Path("sql/views.sql")
 
 # staging table, the cleaned csv copied into it, and the table whose row count it must match once loaded
 STAGING = [
@@ -52,6 +53,8 @@ def main():
             for table, name, _ in STAGING:
                 copy_csv(cur, table, PROCESSED / name)
             cur.execute(LOAD_SQL.read_text(encoding="utf-8"))
+            # schema.sql drops anything that depend on the fact tables when rerun, so the views are recreated here to be maintained
+            cur.execute(VIEWS_SQL.read_text(encoding="utf-8"))
 
             # every csv row must have become exactly one row in its table, inner joins would drop any that did not match
             print(f"{'table':<25}{'csv rows':>10}{'loaded':>10}")
