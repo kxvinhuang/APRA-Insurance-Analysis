@@ -1,8 +1,8 @@
 # Australian Life Insurance Claims & Disputes Analytics
 
-A data validation and cleaning project built on APRA's public life insurance claims and disputes statistics (June 2018 to June 2026), covering **all authorised life insurers**.
+A data validation, cleaning and reporting project built on APRA's public life insurance claims and disputes statistics (June 2018 to June 2026), covering **all authorised life insurers**. The data is validated and cleaned in Python, loaded into a PostgreSQL star schema, and reported in a Power BI dashboard.
 
-> **Status: work in progress** (last updated 28 Oct 2026). The inspection, validation, cleaning and database load and check stages are done.
+> **Status: work in progress** (last updated 4 Nov 2026). The inspection, validation, cleaning, database and analysis view stages are done, and the Power BI dashboard is in progress.
 
 ## Project status
 
@@ -10,10 +10,12 @@ A data validation and cleaning project built on APRA's public life insurance cla
 |---|---|---|
 | Inspect raw data | Done | `src/inspect_data.py` |
 | Validate raw data | Done | `src/validate_data.py`, `docs/data_validation.md` |
-| Investigate data quirks | Done | `src/inspect_duration_conflicts.py`, `src/inspect_disputes_spelling.py` |
+| Investigate data quirks | Done | `src/inspect_duration_conflicts.py`, `src/inspect_disputes_spelling.py`, `src/inspect_masking.py` |
 | Clean to tidy CSVs | Done | `src/clean_data.py`, `docs/cleaning_log.txt` |
 | Load to PostgreSQL | Done | `src/load_to_sql.py`, `sql/schema.sql`, `sql/load.sql` |
 | Check the database against the reports | Done | `sql/checks.sql` |
+| Build analysis views for Power BI | Done | `sql/views.sql` |
+| Power BI dashboard | In progress | `powerbi/insurance_dashboard.pbix`, `powerbi/measures.dax` |
 
 ## The data
 
@@ -89,7 +91,7 @@ Rows flagged and kept: 24 Claims and 20 Disputes rows with `is_invalid_combo` (t
 
 ## Database
 
-The cleaned CSVs are loaded into a PostgreSQL star schema. `sql/schema.sql` creates the tables, `src/load_to_sql.py` copies each CSV into a staging table, and `sql/load.sql` builds the dimensions and facts from staging. `sql/checks.sql` holds queries that re-derive numbers from the validation and cleaning reports (row counts, value status, flagged rows, industry Total against the sum of insurers, claims reconciliation, and masking by company).
+The cleaned CSVs are loaded into a PostgreSQL star schema. `sql/schema.sql` creates the tables, `src/load_to_sql.py` copies each CSV into a staging table, and `sql/load.sql` builds the dimensions and facts from staging. `sql/checks.sql` holds queries that re-derive numbers from the validation and cleaning reports (row counts, value status, flagged rows, industry Total against the sum of insurers, claims reconciliation, and masking by company). Its results match the validation and cleaning reports.
 
 | Type | Tables |
 |---|---|
@@ -108,6 +110,18 @@ Load results (every CSV row became exactly one row in its table):
 
 The dimensions hold 17 dates, 21 companies (20 insurers plus the industry Total), 5 channels (the four channels plus Total), 7 covers, 28 categories (27 plus a "no category" row) and 35 measures.
 
+`sql/views.sql` creates seven views that pivot the long fact tables into one row per date, company, channel and cover, which is the shape Power BI needs. They leave out the rows in invalid cover/channel combinations and the out-of-range values, and keep masked and missing values as NULL.
+
+| View | What it holds |
+|---|---|
+| `v_policy` | lives insured, annual premium, sum insured, market share, new business and lapse rates |
+| `v_claims` | claim outcomes, average sum insured and estimated average duration |
+| `v_claims_duration` | one row per time band, with an estimated claim count |
+| `v_disputes` | dispute outcomes, lodgement ratio, average amount paid and duration |
+| `v_industry_reasons` | why claims are declined or withdrawn and disputes withdrawn or reversed (industry level) |
+| `v_industry_ratios` | claims frequency and claims paid ratio (industry level) |
+| `v_masking` | masked against total rows, for the data quality page |
+
 Design decisions:
 
 - **Companies are keyed on ABN**, with a name history table, so a renamed insurer stays one company. The industry Total has no ABN.
@@ -117,6 +131,60 @@ Design decisions:
 - **`is_additive` marks which measures can be summed** (counts and dollar totals, but not rates, averages or shares). This is my own classification and not something APRA publishes.
 - **The Total flags live on the dimensions** (`is_industry_total`, `is_total_channel`, `is_total_category`), so one filter excludes them everywhere.
 - **The load is one transaction.** It compares each table's row count with its CSV and rolls everything back if any count differs, so a failed load leaves the database as it was.
+
+## Dashboard
+
+The Power BI report (`powerbi/insurance_dashboard.pbix`) imports the four dimension tables and the seven views: 11 tables, 26 relationships and 33 DAX measures (`powerbi/measures.dax`).
+
+| Page | Question it answers | Status |
+|---|---|---|
+| Market overview | Who writes the premium, and how are share, lapse and new business rates moving? | Built |
+| Claims experience | How often are claims admitted, by cover and insurer, compared with the industry? | In progress |
+| Claim duration | How long do insurers take to finalise claims? | In progress |
+| Disputes | How many disputes are lodged, and how often are decisions reversed? | In progress |
+| Why claims fail | Why are claims declined or withdrawn, and disputes withdrawn or reversed? | In progress |
+| Data quality | How much of the data does APRA hide, by insurer? | In progress |
+
+How the measures follow the design principles:
+
+- **Additive measures are blank unless exactly one reporting date is selected**, so overlapping 12-month windows are never added together.
+- **Base measures exclude the industry Total company.** Separate "industry" measures use APRA's own Total rows as the benchmark, because the Total is usually shown even when individual insurers are masked.
+- **Rates use only rows where the numerator and denominator are both visible**, so a hidden value never skews a rate.
+- **Lives insured is counted once per cover**, so a total across covers is not a count of distinct people.
+
+![Market overview page](docs/images/market_overview.png)
+
+## Key results (Jun 2026)
+
+Industry claims and insurer dispute outcomes at the latest reporting date, from `v_claims` and `v_disputes`.
+
+**Claim admit rate by cover** (admitted claims divided by finalised claims, using APRA's industry totals where the figures are shown in full):
+
+| Cover | Finalised claims | Admit rate |
+|---|---|---|
+| Accident | 2,083 | 86.1% |
+| Trauma | 5,269 | 87.3% |
+| TPD | 23,949 | 87.8% |
+| CCI | 914 | 92.0% |
+| DII | 34,501 | 95.4% |
+| Death | 16,456 | 97.6% |
+| Funeral | 15,244 | 99.8% |
+
+The admit rate leaves out withdrawn and undetermined claims. APRA also counts cases where the insurer paid something other than the full benefit (for example a partial settlement or premium refund) as declined.
+
+**Dispute reversal rate by cover** (reversed disputes divided by resolved disputes, for insurers whose dispute data APRA shows in full):
+
+| Cover | Resolved disputes | Reversed disputes | Reversal rate |
+|---|---|---|---|
+| Trauma | 375 | 14 | 3.7% |
+| Death | 416 | 13 | 3.1% |
+| DII | 6,172 | 157 | 2.5% |
+| TPD | 4,003 | 84 | 2.1% |
+| Accident | 62 | 1 | 1.6% |
+| Funeral | 234 | 0 | 0.0% |
+| CCI | 107 | 0 | 0.0% |
+
+"Other dispute outcomes" is a separate category from "reversed", so the reversal rate is not the share of disputes that ended in the claimant's favour. Counts for Accident, CCI and Funeral are small, so those rates move a lot with a few disputes.
 
 ## Repository structure
 
@@ -129,14 +197,18 @@ APRA-Insurance-Analysis/
 │   ├── inspect_data.py               # sheet names, shapes, previews, masked counts
 │   ├── validate_data.py              # integrity checks -> docs/data_validation.md
 │   ├── inspect_duration_conflicts.py # one-off investigation behind finding 5
-│   ├── inspect_masking.py            # one-off inspection behind finding 1
 │   ├── inspect_disputes_spelling.py  # one-off check behind finding 4
+│   ├── inspect_masking.py            # masked share of values per insurer, from the raw sheets
 │   ├── clean_data.py                 # tidy, typed, flagged CSVs
 │   └── load_to_sql.py                # loads the CSVs into PostgreSQL and checks row counts
 ├── sql/
 │   ├── schema.sql                    # star schema and staging tables
 │   ├── load.sql                      # builds dimensions and facts from staging
+│   ├── views.sql                     # analysis views for Power BI
 │   └── checks.sql                    # queries that re-derive numbers from the reports
+├── powerbi/
+│   ├── insurance_dashboard.pbix      # the dashboard (holds an imported copy of the data)
+│   └── measures.dax                  # all 33 DAX measures
 ├── docs/
 │   ├── data_validation.md
 │   ├── cleaning_log.txt
@@ -166,10 +238,12 @@ PGPASSWORD=your_password
 python src/inspect_data.py
 python src/validate_data.py     # writes docs/data_validation.md
 python src/clean_data.py        # writes data/processed/*.csv and docs/cleaning_log.txt
-python src/load_to_sql.py       # builds the tables in PostgreSQL and checks the row counts
+python src/load_to_sql.py       # builds the tables and views in PostgreSQL and checks the row counts
 ```
 
 Then run `sql/checks.sql` in pgAdmin or psql to compare the database with the validation and cleaning reports.
+
+To open the dashboard, use Power BI Desktop (Windows) to open `powerbi/insurance_dashboard.pbix`. It holds an imported copy of the data, so it opens without the database. To refresh it, point its data source at your own PostgreSQL database (Home, then Transform data, then Data source settings).
 
 ## Limitations
 
@@ -177,11 +251,13 @@ Then run `sql/checks.sql` in pgAdmin or psql to compare the database with the va
 - The Other sheet has no company dimension, so reasons and ratios are market-wide only.
 - Insurers that left or were renamed are separate entries in time, so market trends partly reflect entries and exits.
 - The glossary lists seven duration buckets, but the file has five for claims and three for disputes, so average duration is taken as reported and not recomputed.
-- Findings apply to this release only.
+- Lives insured is counted per cover, so adding it across covers counts a person once for each cover they hold.
+- The dashboard file is a snapshot of the data at the time it was saved and does not update itself when the database changes.
+- Findings apply to this release only and haven’t been re-checked against later releases.
 
 ## Tech
 
-Python (pandas, numpy, psycopg2) and PostgreSQL.
+Python (pandas, numpy, psycopg2), PostgreSQL and Power BI (DAX).
 
 ## Data source and disclaimer
 
