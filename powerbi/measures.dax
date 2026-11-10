@@ -134,7 +134,9 @@ IF ( [Dates Selected] = 1,
 
 // Format: Percentage, 1 decimal
 Band Share =
-DIVIDE ( [Band Claims (est.)], CALCULATE ( [Band Claims (est.)], REMOVEFILTERS ( v_claims_duration[band] ) ) )
+DIVIDE ( [Band Claims (est.)],
+         CALCULATE ( [Band Claims (est.)],
+                     REMOVEFILTERS ( v_claims_duration[band], v_claims_duration[band_order] ) ) )
 
 // Format: Percentage, 1 decimal
 Industry Band Share =
@@ -144,7 +146,7 @@ IF ( [Dates Selected] = 1,
                 REMOVEFILTERS ( dim_company ), dim_company[is_industry_total] = TRUE ),
     CALCULATE ( SUM ( v_claims_duration[est_claims] ),
                 REMOVEFILTERS ( dim_company ), dim_company[is_industry_total] = TRUE,
-                REMOVEFILTERS ( v_claims_duration[band] ) ) ) )
+                REMOVEFILTERS ( v_claims_duration[band], v_claims_duration[band_order] ) ) ) )
 
 
 // ===== industry ratios (Other sheet) =========================================================
@@ -166,19 +168,19 @@ Disputes Lodged =
 IF ( [Dates Selected] = 1,
      CALCULATE ( SUM ( v_disputes[lodged] ), dim_company[is_industry_total] = FALSE ) )
 
-// Format: Whole number
+// Format: Whole number, thousands separator
 Disputes Resolved (visible) =
 CALCULATE ( SUM ( v_disputes[resolved] ), v_disputes[has_outcomes] = TRUE, dim_company[is_industry_total] = FALSE )
 
-// Format: Whole number
+// Format: Whole number, thousands separator
 Disputes Reversed (visible) =
 CALCULATE ( SUM ( v_disputes[reversed] ), v_disputes[has_outcomes] = TRUE, dim_company[is_industry_total] = FALSE )
 
-// Format: Whole number
+// Format: Whole number, thousands separator
 Disputes Maintained (visible) =
 CALCULATE ( SUM ( v_disputes[maintained] ), v_disputes[has_outcomes] = TRUE, dim_company[is_industry_total] = FALSE )
 
-// Format: Whole number
+// Format: Whole number, thousands separator
 Disputes Other Outcomes (visible) =
 CALCULATE ( SUM ( v_disputes[other_outcomes] ), v_disputes[has_outcomes] = TRUE, dim_company[is_industry_total] = FALSE )
 
