@@ -2,7 +2,7 @@
 
 A data validation, cleaning and reporting project built on APRA's public life insurance claims and disputes statistics (June 2018 to June 2026), covering **all authorised life insurers**. The data is validated and cleaned in Python, loaded into a PostgreSQL star schema, and reported in a Power BI dashboard.
 
-> **Status: work in progress** (last updated 4 Nov 2026). The inspection, validation, cleaning, database and analysis view stages are done, and the Power BI dashboard is in progress.
+> **Status: complete** (last updated 11 Nov 2026). Inspection, validation, cleaning, the PostgreSQL database, the analysis views and the six-page Power BI dashboard are all done.
 
 ## Project status
 
@@ -15,7 +15,7 @@ A data validation, cleaning and reporting project built on APRA's public life in
 | Load to PostgreSQL | Done | `src/load_to_sql.py`, `sql/schema.sql`, `sql/load.sql` |
 | Check the database against the reports | Done | `sql/checks.sql` |
 | Build analysis views for Power BI | Done | `sql/views.sql` |
-| Power BI dashboard | In progress | `powerbi/insurance_dashboard.pbix`, `powerbi/measures.dax` |
+| Power BI dashboard | Done | `powerbi/insurance_dashboard.pbix`, `powerbi/measures.dax` |
 
 ## The data
 
@@ -136,14 +136,16 @@ Design decisions:
 
 The Power BI report (`powerbi/insurance_dashboard.pbix`) imports the four dimension tables and the seven views: 11 tables, 26 relationships and 33 DAX measures (`powerbi/measures.dax`).
 
-| Page | Question it answers | Status |
-|---|---|---|
-| Market overview | Who writes the premium, and how are share, lapse and new business rates moving? | Built |
-| Claims experience | How often are claims admitted, by cover and insurer, compared with the industry? | In progress |
-| Claim duration | How long do insurers take to finalise claims? | In progress |
-| Disputes | How many disputes are lodged, and how often are decisions reversed? | In progress |
-| Why claims fail | Why are claims declined or withdrawn, and disputes withdrawn or reversed? | In progress |
-| Data quality | How much of the data does APRA hide, by insurer? | In progress |
+The dashboard has six pages, each answering the following questions:
+
+| Page | Question it answers |
+|---|---|
+| Market Overview | Who writes the premium, and how are share, lapse and new business rates moving? |
+| Claims Experience | How often are claims admitted, by cover and insurer, compared with the industry? |
+| Claim Duration | How long do insurers take to finalise claims? |
+| Disputes | How many disputes are lodged, and how often are decisions reversed? |
+| Why Claims Fail | Why are claims declined or withdrawn, and disputes withdrawn or reversed? |
+| Data Quality | How much of the data does APRA hide, by insurer? |
 
 How the measures follow the design principles:
 
@@ -152,7 +154,21 @@ How the measures follow the design principles:
 - **Rates use only rows where the numerator and denominator are both visible**, so a hidden value never skews a rate.
 - **Lives insured is counted once per cover**, so a total across covers is not a count of distinct people.
 
-![Market overview page](docs/images/market_overview.png)
+How the report is built to be read safely:
+
+- **A sidebar with a page navigator**, and date, cover and channel slicers that stay in step across pages.
+- **Trend charts do not filter the other visuals**, because a click on a trend point would add a date that conflicts with the single-date slicer.
+- **Heatmaps keep blanks visible** so hidden data shows as a gap, not a zero, and insurers with every value masked do not appear in the claims heatmap.
+- **Industry benchmarks come from APRA's own totals**, while insurer-level rates use only the insurers APRA shows in full.
+
+![Market Overview](docs/images/market_overview.png)
+
+Highlights at Jun 2026 (the dashboard's default view):
+
+- Annual premium across the insurers is about $19bn. TAL Life Limited is the largest at $6.5bn, ahead of AIA Australia ($3.3bn) and Zurich Australia ($2.9bn).
+- The industry claim admit rate is 94.0%.
+- Claims take 1.8 months to finalise on average. 55.2% are finalised within two weeks, and 1.4% take longer than a year.
+- 13,385 disputes were lodged by the insurers shown, and 2.4% of resolved disputes ended in a reversed decision.
 
 ## Key results (Jun 2026)
 
@@ -210,11 +226,14 @@ APRA-Insurance-Analysis/
 │   ├── insurance_dashboard.pbix      # the dashboard (holds an imported copy of the data)
 │   └── measures.dax                  # all 33 DAX measures
 ├── docs/
+│   ├── images/
+│   │   └── market_overview.png       # image of default first page of dashboard
 │   ├── data_validation.md
 │   ├── cleaning_log.txt
 │   └── conflicting_duplicates_claims.csv
 ├── .env                 # database connection details (not committed)
 ├── .gitignore
+├── Insurance Dashboard (Preview).pdf       # export of the six dashboard pages
 ├── requirements.txt
 └── README.md
 ```
@@ -253,6 +272,7 @@ To open the dashboard, use Power BI Desktop (Windows) to open `powerbi/insurance
 - The glossary lists seven duration buckets, but the file has five for claims and three for disputes, so average duration is taken as reported and not recomputed.
 - Lives insured is counted per cover, so adding it across covers counts a person once for each cover they hold.
 - The dashboard file is a snapshot of the data at the time it was saved and does not update itself when the database changes.
+- Dashboard figures depend on the date, cover and channel selected, so a share such as an insurer's masked share can be very different for one date or cover than over all dates.
 - Findings apply to this release only and haven’t been re-checked against later releases.
 
 ## Tech
