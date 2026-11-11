@@ -1,3 +1,5 @@
+![Market Overview](docs/images/market_overview.png)
+
 # Australian Life Insurance Claims & Disputes Analytics
 
 A data validation, cleaning and reporting project built on APRA's public life insurance claims and disputes statistics (June 2018 to June 2026), covering **all authorised life insurers**. The data is validated and cleaned in Python, loaded into a PostgreSQL star schema, and reported in a Power BI dashboard.
@@ -160,8 +162,6 @@ How the report is built to be read safely:
 - **Trend charts do not filter the other visuals**, because a click on a trend point would add a date that conflicts with the single-date slicer.
 - **Heatmaps keep blanks visible** so hidden data shows as a gap, not a zero, and insurers with every value masked do not appear in the claims heatmap.
 - **Industry benchmarks come from APRA's own totals**, while insurer-level rates use only the insurers APRA shows in full.
-
-![Market Overview](docs/images/market_overview.png)
 
 Highlights at Jun 2026 (the dashboard's default view):
 
